@@ -198,7 +198,7 @@ if applicant_id:
         # Similar Clients
         compare_with_others = st.sidebar.radio("Characteristics of other similar applicants :",
             options=[
-                "Distribution of probability",
+                #"Distribution of probability",
                 "Gender",
                 "Family status",
                 #"Number of Children",
@@ -210,17 +210,17 @@ if applicant_id:
             )
 
         # First histogram
-        if compare_with_others=="Distribution of probability":
-            bin_number = st.slider("Number of bins",min_value=10, max_value=100, value=42)
-            fig5a = px.histogram(
-                x=data_index.loc[similar_ids,"PROBABILITY_PAYING"],
-                color=data_index.loc[similar_ids,"PREDICTION"],
-                nbins=bin_number,
-                labels=dict(color='Labels', x='probability of repaying'),
-                )
-            st.plotly_chart(fig5a, use_container_width=container_width)
-            show_info()
-            st.info(f"- {0} : repaying \n - {1} : not repaying")
+        #if compare_with_others=="Distribution of probability":
+            #bin_number = st.slider("Number of bins",min_value=10, max_value=100, value=42)
+            #fig5a = px.histogram(
+                #x=data_index.loc[similar_ids,"PROBABILITY_PAYING"],
+                #color=data_index.loc[similar_ids,"PREDICTION"],
+                #nbins=bin_number,
+                #labels=dict(color='Labels', x='probability of repaying'),
+                #)
+            #st.plotly_chart(fig5a, use_container_width=container_width)
+            #show_info()
+            #st.info(f"- {0} : repaying \n - {1} : not repaying")
 
         # Second histogram
         if compare_with_others=="Gender":
