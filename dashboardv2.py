@@ -10,7 +10,6 @@ import requests
 from lime import lime_tabular
 import streamlit.components.v1 as components
 import pickle
-import dill
 
 model = pickle.load(open('LGBM_model.pkl','rb'))
 
@@ -49,17 +48,14 @@ ytrain = get_dataset("ytrain.csv")
 #---
 
 # Lime training
-with open('explainer', 'rb') as explainer:
-   dill.load(explainer)
-
-# explainer = lime_tabular.LimeTabularExplainer(
-#     training_data=Xtrain.values,
-#     mode='classification',
-#     feature_names=Xtrain.columns, 
-#     #categorical_features=ytrain3.values, 
-#     training_labels=ytrain.values,
-#     #random_state=7
-# )
+explainer = lime_tabular.LimeTabularExplainer(
+    training_data=Xtrain.values,
+    mode='classification',
+    feature_names=Xtrain.columns, 
+    #categorical_features=ytrain3.values, 
+    training_labels=ytrain.values,
+    #random_state=7
+)
 
 # Selectbox for selection of applicant through SK_ID_CURR
 applicant_id = st.sidebar.selectbox(label="Select or write applicant's ID :", options=data_clients.SK_ID_CURR, index=0)
@@ -76,7 +72,8 @@ if applicant_id:
     
     # Figure showing probabilities
     #url_api = "http://127.0.0.1:5000"
-    url_api = "https://api-flask-version6.herokuapp.com/"
+    #url_api = "https://api-flask-version6.herokuapp.com/"
+    url_api = "https://api-lime-use.herokuapp.com/"
     response = requests.post(url=url_api, json={'applicant_id':applicant_id})
     
     if response.status_code == 200:
