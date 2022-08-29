@@ -1,6 +1,4 @@
 import streamlit as st
-from streamlit_lottie import st_lottie
-from st_aggrid import AgGrid
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -9,6 +7,12 @@ import seaborn as sns
 from PIL import Image
 import requests
 
+from lime import lime_tabular
+import streamlit.components.v1 as components
+import pickle
+import dill
+
+model = pickle.load(open('LGBM_model.pkl','rb'))
 
 # Title
 st.set_page_config(page_title="Home Credit Default Risk")
@@ -25,12 +29,37 @@ def get_dataset(csv_file ):
 # Tables
 data_clients = get_dataset("processed_test_data.csv") # modification
 data = get_dataset("dashboard_test_data.csv")
-data_index = data.set_index("SK_ID_CURR")
+data_index = data_clients.set_index("SK_ID_CURR")
 descriptions_id = get_dataset("descriptions_applicants.csv")
 descriptions_id_index = descriptions_id.set_index("SK_ID_CURR")
 roc_curve = get_dataset("fpr_tpr_table.csv")
 precision_recall = get_dataset("precision_recall_table.csv")
 y_table = get_dataset("y_table.csv")
+Xtrain = get_dataset("Xtrain.csv")
+ytrain = get_dataset("ytrain.csv")
+
+#---
+# print(f"Xtrain :{Xtrain.shape}")
+# print(f"data :{data.shape}")
+# print(f"data_index :{data_index.shape}")
+# print(f"data_clients :{data_clients.shape}")
+
+
+#print(f"Xtrain columns :\n{Xtrain.columns}")
+#---
+
+# Lime training
+with open('explainer', 'rb') as explainer:
+   dill.load(explainer)
+
+# explainer = lime_tabular.LimeTabularExplainer(
+#     training_data=Xtrain.values,
+#     mode='classification',
+#     feature_names=Xtrain.columns, 
+#     #categorical_features=ytrain3.values, 
+#     training_labels=ytrain.values,
+#     #random_state=7
+# )
 
 # Selectbox for selection of applicant through SK_ID_CURR
 applicant_id = st.sidebar.selectbox(label="Select or write applicant's ID :", options=data_clients.SK_ID_CURR, index=0)
@@ -41,22 +70,12 @@ if applicant_id:
     # Multiselect options for the applicant's personal information.
     id_options = st.multiselect("Select the columns you want to see :", descriptions_id.columns, default=["NAME_CONTRACT_TYPE","CODE_GENDER","CNT_CHILDREN","AMT_INCOME_TOTAL"])
     id_table = st.dataframe(descriptions_id.loc[descriptions_id.SK_ID_CURR==applicant_id,id_options])
-    
-    # Features for scoring
-    scoring_features = st.checkbox(label="Show important features used for scoring:", value=False)
-    if scoring_features:
-        st.write("Important features in scoring:")
-        # Multiselect options for features used in calculating the probabilities.
-        features_options = st.multiselect(label="Features and probabilities:",
-        options=data.columns,
-        default=["PAYMENT_RATE","EXT_SOURCE_1","EXT_SOURCE_2","EXT_SOURCE_3","DAYS_BIRTH"]
-        )
-        important_features_table = st.dataframe(data.loc[data.SK_ID_CURR==applicant_id,features_options])
-
 
     # Buttons
     get_score = st.sidebar.radio("Applicant's score", options=["Show score","Hide score"], index=0)
+    
     # Figure showing probabilities
+    #url_api = "http://127.0.0.1:5000"
     url_api = "https://api-flask-version6.herokuapp.com/"
     response = requests.post(url=url_api, json={'applicant_id':applicant_id})
     
@@ -67,14 +86,40 @@ if applicant_id:
     else:
         print(response.status_code)
 
-    # proba_paying = np.round(float(data.loc[data.SK_ID_CURR==applicant_id, "PROBABILITY_PAYING"].values),2)
-    # proba_not_paying = np.round(float(data.loc[data.SK_ID_CURR==applicant_id, "PROBABILITY_NOT_PAYING"].values),2)
+    proba_paying = round(proba_paying,2)
+    proba_not_paying = round(proba_not_paying,2)
+
+    # Features for scoring
+    scoring_features = st.checkbox(label="Explain results:", value=False)
+    if scoring_features:
+        st.write("Important features in scoring:")
+        #Xtest = data.loc[data_clients.SK_ID_CURR==applicant_id,:]#data.drop(columns='SK_ID_CURR').reset_index(drop=True)
+        #st.write(data_index.loc[applicant_id,:])
+
+        explanation = explainer.explain_instance(
+            data_index.loc[applicant_id,:].values, 
+            model.predict_proba, 
+            num_features=len(data_index.columns)
+            )
+        html_lime = explanation.as_html()
+        components.html(html_lime,scrolling=True, height=800)
+
+
+        # explanation.show_in_notebook()
+        #explanation.as_pyplot_figure();
+
+        # Multiselect options for features used in calculating the probabilities.
+        # features_options = st.multiselect(label="Features and probabilities:",
+        # options=data.columns,
+        # default=["PAYMENT_RATE","EXT_SOURCE_1","EXT_SOURCE_2","EXT_SOURCE_3","DAYS_BIRTH"]
+        # )
+        # important_features_table = st.dataframe(data.loc[data.SK_ID_CURR==applicant_id,features_options])
 
     if get_score == "Show score":
         if proba_paying>proba_not_paying:
-            st.sidebar.markdown(f"<h2 style='text_align:right; color: lightgreen;'>Score={proba_paying}, Credit approved !</h2>", unsafe_allow_html=True)
+            st.sidebar.markdown(f"<h2 style='text_align:right; color: darkgreen;'>Score={proba_paying}, Credit approved !</h2>", unsafe_allow_html=True)
         else:
-            st.sidebar.markdown(f"<h2 style='text_align:right; color: red;'>Score={proba_paying}, Credit refused !</h2>", unsafe_allow_html=True)        
+            st.sidebar.markdown(f"<h2 style='text_align:right; color: darkred;'>Score={proba_paying}, Credit refused !</h2>", unsafe_allow_html=True)        
 
 
     graphs = st.sidebar.radio(label="Graphs", options=["Model performance","Similar applicants"], index=0)
